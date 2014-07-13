@@ -6,6 +6,13 @@ import re
 import xml.dom.minidom
 import time
 
+
+
+############################################
+#based on vNAM version 6.0.1 reference guide
+#http://www.cisco.com/c/dam/en/us/td/docs/net_mgmt/network_analysis_module_software/6-0-2/developer/guide/nam-rest-api-guide.pdf
+
+
 ############################################
 Global_API_uri_NTP ='/nbi/nbi-ntp'
 Global_API_uri_CSV ='/nbi/nbi-csvquery'
