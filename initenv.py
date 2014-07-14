@@ -17,7 +17,17 @@ import time
 Global_API_uri_NTP ='/nbi/nbi-ntp'
 Global_API_uri_CSV ='/nbi/nbi-csvquery'
 Global_API_uri_Sysinfo ='/nbi/nbi-system'
+Global_API_uri_Application='/nbi/nbi-apps'
 Global_NAM_timeformat = '%Y-%b-%d, %H:%M:%S '
+
+Global_CoreConv_query = '''<query-data>
+ <query>
+ SELECT time,site1,addr1,site2,addr2,appId,ipProtocol,octets1to2,octets2to1, inIf, outIf,packets1to2,packets2to1,serverPort,dataSource
+ FROM CoreConv
+ WHERE TIME >= %s AND TIME <= %s
+ </query>
+</query-data>'''
+
 
 ############################################
 #autheticate the NAM and return cookies
@@ -51,15 +61,22 @@ def get_auth_url(ip, user, pswd):
 
 
 ############################################
-#NAM API funciton(nam_url, api, query_methond,query_timerange)
-def NAM_api(nam_url,uri,method,query_method,query_timerange):
+#NAM API funciton(nam_url, api, method,query_methond,options)
+def NAM_api(nam_url,uri,method,query_method,options):
     r = [m.start() for m in re.finditer('/', nam_url[0])]
     api_url=nam_url[0]
     api_url=api_url[:r[2]]+uri
 
     
+    if uri==Global_API_uri_CSV:
+        reqObj = urllib2.Request(api_url,query_method)
 
-    reqObj = urllib2.Request(api_url)
+        print uri
+        print '\n'
+        print query_method
+    else:        
+        reqObj = urllib2.Request(api_url)
+
     reqObj.add_header('cookie', nam_url[1])    
     try:
         reqResult = urllib2.urlopen(reqObj,timeout=5).read()
@@ -158,10 +175,11 @@ def main(b):
         click.echo('\n=====please select option========')
         click.echo('1. Get NAM datetime')
         click.echo('2. Get NAM system information')
-        click.echo('3. Get host conversations')
+        click.echo('3. Get Applications')
+        click.echo('4. Get CoreConv list')
         click.echo('q. Quit')
 
-        menu_option=click.prompt('NAM function choice:',default='3')
+        menu_option=click.prompt('NAM function choice:',default='4')
 
         if menu_option == '1':#get NAM current time
 
@@ -180,15 +198,43 @@ def main(b):
                 cdbfiles= root.getElementsByTagName('file')
 
                 for n in cdbfiles:  
-                    if 'CoreConv.cdb' == n.getElementsByTagName('name')[0].childNodes[0].nodeValue:
+##                    if 'CoreConv.cdb' == n.getElementsByTagName('name')[0].childNodes[0].nodeValue:
                         print '\n%s record range:' %n.getElementsByTagName('name')[0].childNodes[0].nodeValue                    
                         print '         %s' %time.ctime(float(n.getElementsByTagName('oldestDataTime')[0].childNodes[0].nodeValue)).strip()
                         print '         %s' %time.ctime(float(n.getElementsByTagName('newestDataTime')[0].childNodes[0].nodeValue)).strip()
+        elif menu_option=='3':#get lattest content of Applications
 
-        elif menu_option=='3':#get content of CoreConv database
+            appdict={}
+            doc = NAM_api(nam_list[nam_ip],Global_API_uri_Application,'get','',[])
+            root=doc.documentElement
+            applicationid= root.getElementsByTagName('applicationId')
+
+            for n in applicationid:  
+                appdict[n.getElementsByTagName('appTag')[0].childNodes[0].nodeValue]=n.getElementsByTagName('name')[0].childNodes[0].nodeValue
+
+            print appdict
+            
+        elif menu_option=='4':#get content of CoreConv database
+
+            #get NAM current time
             doc = NAM_api(nam_list[nam_ip],Global_API_uri_NTP,'get','',[])
-            nam_result = doc.getElementsByTagName("time")[0].childNodes[0].nodeValue
-            print time.strptime(nam_result[:len(nam_result)-3],Global_NAM_timeformat)
+            nam_currenttime = doc.getElementsByTagName("time")[0].childNodes[0].nodeValue
+##            print nam_currenttime
+##            print time.strptime(nam_currenttime[:len(nam_currenttime)-3],Global_NAM_timeformat)
+##            print time.mktime(time.strptime(nam_currenttime[:len(nam_currenttime)-3],Global_NAM_timeformat))
+            nam_currenttime_int=int(time.mktime(time.strptime(nam_currenttime[:len(nam_currenttime)-3],Global_NAM_timeformat)))
+##            print nam_currenttime_int
+            query_string = Global_CoreConv_query %(str(nam_currenttime_int-3600), str(nam_currenttime_int))
+            doc = NAM_api(nam_list[nam_ip],Global_API_uri_CSV,'get',query_string,[])
+            root=doc.documentElement
+            print root.getElementsByTagName('description')[0].childNodes[0].nodeValue
+
+##            for n in applicationid:  
+##                n.getElementsByTagName('row')[0].childNodes[0].nodeValue
+##
+##            print appdict            
+
+
         elif menu_option=='q':
             return
             
