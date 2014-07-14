@@ -22,9 +22,10 @@ Global_NAM_timeformat = '%Y-%b-%d, %H:%M:%S '
 
 Global_CoreConv_query = '''<query-data>
  <query>
- SELECT time,site1,addr1,site2,addr2,appId,ipProtocol,octets1to2,octets2to1, inIf, outIf,packets1to2,packets2to1,serverPort,dataSource
- FROM CoreConv
- WHERE TIME >= %s AND TIME <= %s
+  SELECT time,site1,addr1,site2,addr2,appId,ipProtocol,octets1to2,octets2to1, inIf, outIf,packets1to2,packets2to1,serverPort,dataSource
+  FROM CoreConv
+  WHERE TIME &gt;= %s AND TIME &lt;= %s
+  LIMIT 100, 1
  </query>
 </query-data>'''
 
@@ -70,10 +71,6 @@ def NAM_api(nam_url,uri,method,query_method,options):
     
     if uri==Global_API_uri_CSV:
         reqObj = urllib2.Request(api_url,query_method)
-
-        print uri
-        print '\n'
-        print query_method
     else:        
         reqObj = urllib2.Request(api_url)
 
@@ -223,15 +220,23 @@ def main(b):
 ##            print time.strptime(nam_currenttime[:len(nam_currenttime)-3],Global_NAM_timeformat)
 ##            print time.mktime(time.strptime(nam_currenttime[:len(nam_currenttime)-3],Global_NAM_timeformat))
             nam_currenttime_int=int(time.mktime(time.strptime(nam_currenttime[:len(nam_currenttime)-3],Global_NAM_timeformat)))
-##            print nam_currenttime_int
+            currenttime=time.time()
             query_string = Global_CoreConv_query %(str(nam_currenttime_int-3600), str(nam_currenttime_int))
+            currenttime=time.time()-currenttime    
             doc = NAM_api(nam_list[nam_ip],Global_API_uri_CSV,'get',query_string,[])
             root=doc.documentElement
-            print root.getElementsByTagName('description')[0].childNodes[0].nodeValue
+            applicationid= root.getElementsByTagName('query-data')
+            if 'Successful'== root.getElementsByTagName('description')[0].childNodes[0].nodeValue:
 
-##            for n in applicationid:  
-##                n.getElementsByTagName('row')[0].childNodes[0].nodeValue
-##
+                for n in applicationid:
+                    print 'Return %d rows' %len(n.getElementsByTagName('row'))
+                    print 'in %f seconds' %currenttime
+                    for i in range(0,len(n.getElementsByTagName('row'))-1):
+                        print n.getElementsByTagName('row')[i].childNodes[0].nodeValue
+                    
+            else:
+                print 'CDB Query response failed with error %s' %root.getElementsByTagName('description')[0].childNodes[0].nodeValue
+
 ##            print appdict            
 
 
