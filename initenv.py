@@ -25,7 +25,7 @@ Global_CoreConv_query = '''<query-data>
   SELECT time,site1,addr1,site2,addr2,appId,ipProtocol,octets1to2,octets2to1, inIf, outIf,packets1to2,packets2to1,serverPort,dataSource
   FROM CoreConv
   WHERE TIME &gt;= %s AND TIME &lt;= %s
-  LIMIT 100, 1
+  LIMIT 5000, 1
  </query>
 </query-data>'''
 
@@ -168,15 +168,26 @@ def main(b):
 
 #menu options
 
+
     while True:
         click.echo('\n=====please select option========')
         click.echo('1. Get NAM datetime')
         click.echo('2. Get NAM system information')
-        click.echo('3. Get Applications')
+        click.echo('3. CoreConv cdb trend')
         click.echo('4. Get CoreConv list')
         click.echo('q. Quit')
 
         menu_option=click.prompt('NAM function choice:',default='4')
+        #get lattest content of Applications
+        appdict={}
+        doc = NAM_api(nam_list[nam_ip],Global_API_uri_Application,'get','',[])
+        root=doc.documentElement
+        applicationid= root.getElementsByTagName('applicationId')
+
+        for n in applicationid:  
+            appdict[n.getElementsByTagName('appTag')[0].childNodes[0].nodeValue.encode('ascii','ignore')]=n.getElementsByTagName('name')[0].childNodes[0].nodeValue.encode('ascii','ignore')
+
+##            print appdict
 
         if menu_option == '1':#get NAM current time
 
@@ -199,17 +210,10 @@ def main(b):
                         print '\n%s record range:' %n.getElementsByTagName('name')[0].childNodes[0].nodeValue                    
                         print '         %s' %time.ctime(float(n.getElementsByTagName('oldestDataTime')[0].childNodes[0].nodeValue)).strip()
                         print '         %s' %time.ctime(float(n.getElementsByTagName('newestDataTime')[0].childNodes[0].nodeValue)).strip()
-        elif menu_option=='3':#get lattest content of Applications
+        elif menu_option=='3':#NAM CDB files trend
 
-            appdict={}
-            doc = NAM_api(nam_list[nam_ip],Global_API_uri_Application,'get','',[])
-            root=doc.documentElement
-            applicationid= root.getElementsByTagName('applicationId')
-
-            for n in applicationid:  
-                appdict[n.getElementsByTagName('appTag')[0].childNodes[0].nodeValue]=n.getElementsByTagName('name')[0].childNodes[0].nodeValue
-
-            print appdict
+            print 'farming.....'
+            pass
             
         elif menu_option=='4':#get content of CoreConv database
 
@@ -221,19 +225,37 @@ def main(b):
 ##            print time.mktime(time.strptime(nam_currenttime[:len(nam_currenttime)-3],Global_NAM_timeformat))
             nam_currenttime_int=int(time.mktime(time.strptime(nam_currenttime[:len(nam_currenttime)-3],Global_NAM_timeformat)))
             currenttime=time.time()
-            query_string = Global_CoreConv_query %(str(nam_currenttime_int-3600), str(nam_currenttime_int))
+            query_string = Global_CoreConv_query %('0', str(nam_currenttime_int))
             currenttime=time.time()-currenttime    
             doc = NAM_api(nam_list[nam_ip],Global_API_uri_CSV,'get',query_string,[])
             root=doc.documentElement
             applicationid= root.getElementsByTagName('query-data')
+            totalEntries=root.getElementsByTagName('totalEntries')[0].childNodes[0].nodeValue
             if 'Successful'== root.getElementsByTagName('description')[0].childNodes[0].nodeValue:
-
                 for n in applicationid:
-                    print 'Return %d rows' %len(n.getElementsByTagName('row'))
+                    print 'Return %d of' %len(n.getElementsByTagName('row'))
+                    print ' %s totalEntries ' %totalEntries
                     print 'in %f seconds' %currenttime
-                    for i in range(0,len(n.getElementsByTagName('row'))-1):
-                        print n.getElementsByTagName('row')[i].childNodes[0].nodeValue
+                    print 'The oldest and newsest 5 rows are:\n'
+
+
+                    for i in range(0,5):
+                        recordtime=float(n.getElementsByTagName('row')[i].childNodes[0].nodeValue.split(',')[0].encode('ascii','ignore'))
+                        recordtime=time.strftime(Global_NAM_timeformat,time.gmtime(recordtime))
+                        print '%s:%s--%s' % (recordtime,n.getElementsByTagName('row')[i].childNodes[0].nodeValue,appdict[n.getElementsByTagName('row')[i].childNodes[0].nodeValue.split(',')[5].encode('ascii','ignore')])
+
+                    print '......................'
+                    print '......................'
+
+
+                    for i in range(len(n.getElementsByTagName('row'))-6,len(n.getElementsByTagName('row'))-1):
+                        recordtime=float(n.getElementsByTagName('row')[i].childNodes[0].nodeValue.split(',')[0].encode('ascii','ignore'))
+                        recordtime=time.strftime(Global_NAM_timeformat,time.gmtime(recordtime))
+                        print '%s:%s--%s' % (recordtime,n.getElementsByTagName('row')[i].childNodes[0].nodeValue,appdict[n.getElementsByTagName('row')[i].childNodes[0].nodeValue.split(',')[5].encode('ascii','ignore')])
+##                        print appdict[n.getElementsByTagName('row')[i].childNodes[0].nodeValue.split(',')[5].encode('ascii','ignore')]
                     
+
+
             else:
                 print 'CDB Query response failed with error %s' %root.getElementsByTagName('description')[0].childNodes[0].nodeValue
 
