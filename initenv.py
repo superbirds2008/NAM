@@ -25,7 +25,7 @@ Global_CoreConv_query = '''<query-data>
   SELECT time,site1,addr1,site2,addr2,appId,ipProtocol,octets1to2,octets2to1, inIf, outIf,packets1to2,packets2to1,serverPort,dataSource
   FROM CoreConv
   WHERE TIME &gt;= %s AND TIME &lt;= %s
-  LIMIT 5000, 1
+  LIMIT 30000, 1
  </query>
 </query-data>'''
 
@@ -165,6 +165,7 @@ def main(b):
 ##            print nam_list
         else:        
             print 'NAM socket error for %s' % nam_device[0]
+            return False
 
 #menu options
 
@@ -173,11 +174,11 @@ def main(b):
         click.echo('\n=====please select option========')
         click.echo('1. Get NAM datetime')
         click.echo('2. Get NAM system information')
-        click.echo('3. CoreConv cdb trend')
+        click.echo('3. CoreConv cdb trend for last 72 hours')
         click.echo('4. Get CoreConv list')
         click.echo('q. Quit')
 
-        menu_option=click.prompt('NAM function choice:',default='4')
+        menu_option=click.prompt('NAM function choice:',default='3')
         #get lattest content of Applications
         appdict={}
         doc = NAM_api(nam_list[nam_ip],Global_API_uri_Application,'get','',[])
@@ -206,14 +207,33 @@ def main(b):
                 cdbfiles= root.getElementsByTagName('file')
 
                 for n in cdbfiles:  
-##                    if 'CoreConv.cdb' == n.getElementsByTagName('name')[0].childNodes[0].nodeValue:
+                    if 'CoreConv.cdb' == n.getElementsByTagName('name')[0].childNodes[0].nodeValue:
                         print '\n%s record range:' %n.getElementsByTagName('name')[0].childNodes[0].nodeValue                    
                         print '         %s' %time.ctime(float(n.getElementsByTagName('oldestDataTime')[0].childNodes[0].nodeValue)).strip()
                         print '         %s' %time.ctime(float(n.getElementsByTagName('newestDataTime')[0].childNodes[0].nodeValue)).strip()
         elif menu_option=='3':#NAM CDB files trend
+            #get CoreConv cdb record time rang
 
-            print 'farming.....'
-            pass
+            for nam_ip, dummy in nam_list.items():
+                doc = NAM_api(nam_list[nam_ip],Global_API_uri_Sysinfo,'get','',[])
+                root=doc.documentElement
+                cdbfiles= root.getElementsByTagName('file')
+
+                for n in cdbfiles:  
+                    if 'CoreConv.cdb' == n.getElementsByTagName('name')[0].childNodes[0].nodeValue:
+                        oldesttimeRecord = int(n.getElementsByTagName('oldestDataTime')[0].childNodes[0].nodeValue.encode('ascii','ignore'))
+                        newesttimeRecord = int(n.getElementsByTagName('newestDataTime')[0].childNodes[0].nodeValue.encode('ascii','ignore'))
+                intervalRecord = 600*6
+                displayRange= 60*60*24*3
+                for i in range(newesttimeRecord-intervalRecord-displayRange,newesttimeRecord,intervalRecord):
+                    query_string = Global_CoreConv_query %(str(i), str(i+intervalRecord))
+                    doc = NAM_api(nam_list[nam_ip],Global_API_uri_CSV,'get',query_string,[])
+                    root=doc.documentElement
+                    applicationid= root.getElementsByTagName('query-data')
+                    totalEntries=root.getElementsByTagName('totalEntries')[0].childNodes[0].nodeValue
+                    print '         %s:%s' %(time.ctime(float(i)),totalEntries)
+
+
             
         elif menu_option=='4':#get content of CoreConv database
 
